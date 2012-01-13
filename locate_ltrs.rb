@@ -1,10 +1,13 @@
 # http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=73950699&retmode=xml&rettype=text
 # bio = Bio::FastaFormat.new(File.read("/Users/evansenter/Downloads/sequence.fasta"))
 
+require "bio"
+require "entrez"
 require "nokogiri"
 
 class BlastParser
-  ERV_DISTANCE = 4_000..10_000
+  FLANKING_DISTANCE = 5_000
+  ERV_DISTANCE      = 4_000..10_000
   
   attr_reader :xml, :query_length
 
@@ -18,7 +21,7 @@ class BlastParser
   end
   
   def parse_xml
-    @parsed_xml ||= xml.xpath("//BlastOutput_iterations//Iteration//Iteration_hits//Hit").map do |hit_group|
+    xml.xpath("//BlastOutput_iterations//Iteration//Iteration_hits//Hit").map do |hit_group|
       {
         id:        hit_group.xpath("Hit_id").inner_text.split("|")[1],
         accession: hit_group.xpath("Hit_accession").inner_text,
@@ -29,14 +32,38 @@ class BlastParser
   
   def filter
     parse_xml.map do |hash|
-      {
-        id:        hash[:id],
-        accession: hash[:accession],
-        ltr_pairs: filter_array(hash[:locations][:plus]) + filter_array(hash[:locations][:minus])
-      }
+      hash.merge(ltr_pairs: filter_array(hash[:locations][:plus]) + filter_array(hash[:locations][:minus]))
     end.reject do |hash|
       hash[:ltr_pairs].empty?
     end
+  end
+  
+  def flanking_regions!
+    filter.map do |hash|
+      hash.merge(flanking_pairs: flanking_pairs(hash[:id], hash[:ltr_pairs]))
+    end
+  end
+  
+  def flanking_pairs(id, pairs_array)
+    pairs_array.map do |putative_erv|
+      {
+        coordinates: putative_erv,
+        flanking_5:  sequence_from_entrez(id, putative_erv.first.begin - FLANKING_DISTANCE, putative_erv.first.begin - 1),
+        flanking_3:  sequence_from_entrez(id, putative_erv.last.end + 1, putative_erv.last.end + FLANKING_DISTANCE)
+      }
+    end
+  end
+  
+  def sequence_from_entrez(id, start, stop)
+    fasta = Entrez.EFetch("nuccore", {
+      id:        id, 
+      seq_start: start, 
+      seq_stop:  stop, 
+      retmode:   :fasta, 
+      rettype:   :text
+    }).response.body
+    
+    Bio::FastaFormat.new(fasta).seq
   end
   
   private
