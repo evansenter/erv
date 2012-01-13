@@ -42,10 +42,60 @@ class BlastParser
   def flanking_regions!
     filter.map do |hash|
       hash.merge(flanking_pairs: flanking_pairs(hash[:id], hash[:ltr_pairs]))
+    end.reject do |hash|
+      hash[:flanking_pairs][:plus].empty? && hash[:flanking_pairs][:minus].empty?
+    end
+  end
+  
+  def flanking_regions_as_fasta!(path)
+    raise "File can't already exist" if File.exists?(path)
+    
+    fasta_content = formatted_flanking_regions
+    
+    File.open(path, "w") do |file|
+      fasta_content.each do |fasta_sequence|
+        file.write(fasta_sequence[:comment])
+        file.write("\n")
+        file.write(fasta_sequence[:sequence].scan(/.{1,120}/).join("\n"))
+        file.write("\n\n")
+      end
     end
   end
   
   private
+  
+  def formatted_flanking_regions
+    flanking_regions!.inject([]) do |fasta_sequences, hash|
+      plus_regions = hash[:flanking_pairs][:plus].inject([]) do |array, putative_erv|
+        array.concat([
+          formatted_flanking_region(hash[:definition], "5' genomic region", "plus", putative_erv[:putative_erv].first.hit_from, -FLANKING_DISTANCE..-1, putative_erv[:flanking_5])
+          formatted_flanking_region(hash[:definition], "3' genomic region", "plus", putative_erv[:putative_erv].first.hit_to, 1..FLANKING_DISTANCE, putative_erv[:flanking_3])
+        ])
+      end
+        
+      minus_regions = hash[:flanking_pairs][:minus].inject([]) do |array, putative_erv|
+        array.concat([
+          formatted_flanking_region(hash[:definition], "5' genomic region", "minus", putative_erv[:putative_erv].first.hit_to, 1..FLANKING_DISTANCE, putative_erv[:flanking_5])
+          formatted_flanking_region(hash[:definition], "3' genomic region", "minus", putative_erv[:putative_erv].first.hit_from, -FLANKING_DISTANCE..-1, putative_erv[:flanking_3])
+        ])
+      end
+      
+      fasta_sequences.concat(plus_regions).concat(minus_regions)
+    end
+  end
+  
+  def formatted_flanking_region(definition, region, strand, position, window, sequence)
+    {
+      comment: "> %s (%s on %s strand: %s - coordinates %s to %s" % [
+        definition,
+        region,
+        strand,
+        position + window.begin,
+        position + window.end
+      ],
+      sequence: sequence
+    }
+  end
   
   def flanking_pairs(id, pairs_hash)
     {
@@ -86,7 +136,7 @@ class BlastParser
   
   def parse_coordinates(hsps)
     partitioned_hsps = hsps.partition(&method(:same_strand?)).map do |hsps|
-      hsps.sort_by(&method(:midpoint)) #{ |a, b| midpoint(a) <=> midpoint(b) * (same_strand?(a) ? 1 : -1) }
+      hsps.sort_by(&method(:midpoint))
     end
     
     Hash[[:plus, :minus].zip(partitioned_hsps)]
@@ -101,6 +151,5 @@ class BlastParser
   end
 end
 
-parser             = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotation 3 - Johnson/Canis Lupus Familiaris/GY1D8VT9016-Alignment.xml")
-ltr_pairs          = parser.filter
-flanking_sequences = parser.flanking_regions!.map { |hash| hash[:flanking_pairs] }
+# parser = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotation 3 - Johnson/Canis Lupus Familiaris/GY1D8VT9016-Alignment.xml")
+# parser.flanking_regions_as_fasta!("/Users/evansenter/Desktop/genomic_regions.fasta")
