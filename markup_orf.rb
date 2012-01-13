@@ -4,6 +4,8 @@ class Erv
   attr_reader :sequence, :annotations
   
   def self.bootstrap(path)
+    raise "Needs to handle n in sequence and different cases, should just use Bio::Sequence"
+    
     file     = File.read(path)
     sequence = file.gsub(/[^atcg]/, "")
     new(sequence)

@@ -47,10 +47,8 @@ class BlastParser
     end
   end
   
-  def flanking_regions_as_fasta!(path)
+  def write_fasta!(path, fasta_content)
     raise "File can't already exist" if File.exists?(path)
-    
-    fasta_content = formatted_flanking_regions
     
     File.open(path, "w") do |file|
       fasta_content.each do |fasta_sequence|
@@ -62,21 +60,41 @@ class BlastParser
     end
   end
   
-  private
+  def formatted_erv_regions
+    filter.inject([]) do |fasta_sequences, hash|
+      plus_regions = hash[:ltr_pairs][:plus].inject([]) do |array, putative_erv|
+        start = putative_erv.first.hit_from
+        stop  = putative_erv.last.hit_to
+        range = 0..(stop - start)
+        
+        array.concat([formatted_region(hash[:definition], "putative ERV", "plus", hash[:accession], start, range, sequence_from_entrez(hash[:id], start, range))])
+      end
+        
+      minus_regions = hash[:ltr_pairs][:minus].inject([]) do |array, putative_erv|
+        start = putative_erv.first.hit_to
+        stop  = putative_erv.last.hit_from
+        range = 0..(stop - start)
+        
+        array.concat([formatted_region(hash[:definition], "putative ERV", "minus", hash[:accession], start, range, complement(sequence_from_entrez(hash[:id], start, range)))])
+      end
+      
+      fasta_sequences.concat(plus_regions).concat(minus_regions)
+    end
+  end
   
-  def formatted_flanking_regions
+  def formatted_genomic_regions
     flanking_regions!.inject([]) do |fasta_sequences, hash|
       plus_regions = hash[:flanking_pairs][:plus].inject([]) do |array, putative_erv|
         array.concat([
-          formatted_flanking_region(hash[:definition], "5' genomic region", "plus", putative_erv[:putative_erv].first.hit_from, -FLANKING_DISTANCE..-1, putative_erv[:flanking_5])
-          formatted_flanking_region(hash[:definition], "3' genomic region", "plus", putative_erv[:putative_erv].first.hit_to, 1..FLANKING_DISTANCE, putative_erv[:flanking_3])
+          formatted_region(hash[:definition], "5' genomic region", "plus", hash[:accession], putative_erv[:putative_erv].first.hit_from, -FLANKING_DISTANCE..-1, putative_erv[:flanking_5]),
+          formatted_region(hash[:definition], "3' genomic region", "plus", hash[:accession], putative_erv[:putative_erv].first.hit_to, 1..FLANKING_DISTANCE, putative_erv[:flanking_3])
         ])
       end
         
       minus_regions = hash[:flanking_pairs][:minus].inject([]) do |array, putative_erv|
         array.concat([
-          formatted_flanking_region(hash[:definition], "5' genomic region", "minus", putative_erv[:putative_erv].first.hit_to, 1..FLANKING_DISTANCE, putative_erv[:flanking_5])
-          formatted_flanking_region(hash[:definition], "3' genomic region", "minus", putative_erv[:putative_erv].first.hit_from, -FLANKING_DISTANCE..-1, putative_erv[:flanking_3])
+          formatted_region(hash[:definition], "5' genomic region", "minus", hash[:accession], putative_erv[:putative_erv].first.hit_from, 1..FLANKING_DISTANCE, putative_erv[:flanking_5]),
+          formatted_region(hash[:definition], "3' genomic region", "minus", hash[:accession], putative_erv[:putative_erv].first.hit_to, -FLANKING_DISTANCE..-1, putative_erv[:flanking_3])
         ])
       end
       
@@ -84,12 +102,31 @@ class BlastParser
     end
   end
   
-  def formatted_flanking_region(definition, region, strand, position, window, sequence)
+  def sequence_from_entrez(id, position, window)
+    fasta = Entrez.EFetch("nuccore", {
+      id:        id, 
+      seq_start: position + window.begin, 
+      seq_stop:  position + window.end, 
+      retmode:   :fasta, 
+      rettype:   :text
+    }).response.body
+    
+    Bio::FastaFormat.new(fasta).seq
+  end
+  
+  def complement(string)
+    Bio::Sequence::NA.new(string).complement
+  end
+  
+  private
+  
+  def formatted_region(definition, region, strand, accession, position, window, sequence)
     {
       comment: "> %s (%s on %s strand: %s - coordinates %s to %s" % [
         definition,
         region,
         strand,
+        accession,
         position + window.begin,
         position + window.end
       ],
@@ -109,23 +146,11 @@ class BlastParser
       minus: pairs_hash[:minus].map do |putative_erv|
         {
           putative_erv: putative_erv,
-          flanking_5:  Bio::Sequence::NA.new(sequence_from_entrez(id, putative_erv.last.hit_to, 1..FLANKING_DISTANCE)).complement,
-          flanking_3:  Bio::Sequence::NA.new(sequence_from_entrez(id, putative_erv.first.hit_from, -FLANKING_DISTANCE..-1)).complement
+          flanking_5:  complement(sequence_from_entrez(id, putative_erv.last.hit_from, 1..FLANKING_DISTANCE)),
+          flanking_3:  complement(sequence_from_entrez(id, putative_erv.first.hit_to, -FLANKING_DISTANCE..-1))
         }
       end
     }
-  end
-  
-  def sequence_from_entrez(id, position, window)
-    fasta = Entrez.EFetch("nuccore", {
-      id:        id, 
-      seq_start: position + window.begin, 
-      seq_stop:  position + window.end, 
-      retmode:   :fasta, 
-      rettype:   :text
-    }).response.body
-    
-    Bio::FastaFormat.new(fasta).seq
   end
   
   def filter_array(hsps)
