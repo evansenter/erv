@@ -1,6 +1,3 @@
-# http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=73950699&retmode=xml&rettype=text
-# bio = Bio::FastaFormat.new(File.read("/Users/evansenter/Downloads/sequence.fasta"))
-
 require "bio"
 require "entrez"
 require "nokogiri"
@@ -44,6 +41,8 @@ class BlastParser
     end
   end
   
+  private
+  
   def flanking_pairs(id, pairs_array)
     pairs_array.map do |putative_erv|
       {
@@ -65,8 +64,6 @@ class BlastParser
     
     Bio::FastaFormat.new(fasta).seq
   end
-  
-  private
   
   def filter_array(coordinate_array)
     coordinate_array.combination(2).select do |lower, upper|
@@ -93,5 +90,6 @@ class BlastParser
   end
 end
 
-parser    = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotation 3 - Johnson/Canis Lupus Familiaris/GY1D8VT9016-Alignment.xml")
-ltr_pairs = parser.filter
+parser             = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotation 3 - Johnson/Canis Lupus Familiaris/GY1D8VT9016-Alignment.xml")
+ltr_pairs          = parser.filter
+flanking_sequences = parser.flanking_regions!
