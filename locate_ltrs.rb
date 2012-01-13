@@ -1,3 +1,6 @@
+# http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=73950699&retmode=xml&rettype=text
+# bio = Bio::FastaFormat.new(File.read("/Users/evansenter/Downloads/sequence.fasta"))
+
 require "nokogiri"
 
 class BlastParser
@@ -17,6 +20,7 @@ class BlastParser
   def parse_xml
     @parsed_xml ||= xml.xpath("//BlastOutput_iterations//Iteration//Iteration_hits//Hit").map do |hit_group|
       {
+        id:        hit_group.xpath("Hit_id").inner_text.split("|")[1],
         accession: hit_group.xpath("Hit_accession").inner_text,
         locations: parse_coordinates(hit_group)
       }
@@ -26,6 +30,7 @@ class BlastParser
   def filter
     parse_xml.map do |hash|
       {
+        id:        hash[:id],
         accession: hash[:accession],
         ltr_pairs: filter_array(hash[:locations][:plus]) + filter_array(hash[:locations][:minus])
       }
@@ -61,5 +66,5 @@ class BlastParser
   end
 end
 
-parser    = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotation 3 - Johnson/GY1D8VT9016-Alignment.xml")
+parser    = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotation 3 - Johnson/Canis Lupus Familiaris/GY1D8VT9016-Alignment.xml")
 ltr_pairs = parser.filter
