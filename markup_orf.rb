@@ -1,18 +1,26 @@
 require "bio"
+require "./fasta_parser.rb"
+require "./printer.rb"
 
 class Erv
+  include FastaParser
+  
   attr_reader :sequence, :annotations
   
-  def self.bootstrap(path)
-    raise "Needs to handle n in sequence and different cases, should just use Bio::Sequence"
+  class << self
+    def bootstrap_from_dirty_file(path)
+      file     = File.read(path)
+      sequence = file.gsub(/[^atcgn]/, "")
+      new(Bio::Sequence::NA.new(sequence))
+    end
     
-    file     = File.read(path)
-    sequence = file.gsub(/[^atcg]/, "")
-    new(sequence)
+    def bootstrap_from_bio_fasta(fasta)
+      new(fasta.naseq)
+    end
   end
   
   def initialize(sequence)
-    @sequence    = Bio::Sequence::NA.new(sequence)
+    @sequence    = sequence
     @annotations = []
   end
   
@@ -55,55 +63,17 @@ class Erv
     @annotations.clear
   end
   
-  def print(tens_of_aa = 6)
-    Printer.new(self, tens_of_aa).print
+  def printer(tens_of_aa = 6)
+    Printer.new(self, tens_of_aa)
   end
   
-  class Printer
-    attr_reader :erv, :tens_of_aa
-    
-    def initialize(erv, tens_of_aa)
-      @erv        = erv
-      @tens_of_aa = tens_of_aa
-    end
-    
-    def print
-      formatted_indices.zip(formatted_pointers, *formatted_sequences, formatted_annotations).each do |lines| 
-        lines.each(&method(:puts))
-        puts
-      end
-      
-      return nil
-    end
-    
-    private
-    
-    def formatted_indices
-      indices = (0...(erv.sequence.length / 30.0).ceil).map { |i| 10 * i + 1 }.map { |i| "#{((i - 1) * 3) + 1}/#{i}"}.map { |string| "%-30s" % string }
-      indices.each_slice(tens_of_aa).map(&:join)
-    end
-    
-    def formatted_pointers
-      (erv.sequence.length / 30.0).ceil.times.map { ("|" + " " * 29) }.each_slice(tens_of_aa).map(&:join)
-    end
-    
-    def formatted_sequences
-      sequences = (1..3).map { |i| " " * (i - 1) + erv.reading_frames[i].gsub(/./) { |match| "#{match}  " } }.unshift(erv.sequence)
-      sequences.map { |sequence| sequence.scan(/.{1,#{30 * tens_of_aa}}/) }
-    end
-    
-    def formatted_annotations
-      erv.annotations.inject(" " * erv.sequence.length) do |annotation_string, (position, label)|
-        annotation_string.tap do
-          annotation_string[(position - 1)..(position + label.length)] = label
-        end
-      end.scan(/.{1,#{30 * tens_of_aa}}/)
-    end
+  def print(tens_of_aa = 6)
+    printer(tens_of_aa).print
   end
 end
 
-erv = Erv.bootstrap("/Users/evansenter/Documents/School/BC/Rotation 3 - Johnson/Dog Fc Consensus.txt")
-erv.annotate_orf("mgtsqsk", "Gag")
-erv.annotate_orf("rspgsat", "ProPol")
-erv.annotate_orf("cmkgsgt", "Env")
-erv.print
+# erv = Erv.bootstrap_from_dirty_file("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Canis Lupus Familiaris/Dog Fc Consensus.txt")
+# erv.annotate_orf("mgtsqsk", "Gag")
+# erv.annotate_orf("rspgsat", "ProPol")
+# erv.annotate_orf("cmkgsgt", "Env")
+# erv.print(7)
