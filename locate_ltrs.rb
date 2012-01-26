@@ -2,8 +2,7 @@ require "bio"
 require "entrez"
 
 class BlastParser
-  FLANKING_DISTANCE = 5_000
-  ERV_DISTANCE      = 4_000..10_000
+  ERV_DISTANCE = 4_000..12_000
   
   attr_reader :report
 
@@ -21,21 +20,26 @@ class BlastParser
         definition: hit.definition,
         id:         hit.hit_id.split("|")[1],
         accession:  hit.accession,
-        locations:  parse_coordinates(hit.hsps.select { |hsp| hsp.align_len > report.query_len * 0.9 })
+        locations:  parse_coordinates(hit.hsps.select { |hsp| hsp.align_len > report.query_len * 0.8 })
       }
     end
   end
   
   def filter
     parse_xml.map do |hash|
+      plus_ervs, plus_solo_ltrs   = filter_array(hash[:locations][:plus])
+      minus_ervs, minus_solo_ltrs = filter_array(hash[:locations][:minus])
+      
       hash.merge({
         ltr_pairs: {
-          plus:  filter_array(hash[:locations][:plus]),
-          minus: filter_array(hash[:locations][:minus])
+          plus:  plus_ervs,
+          minus: minus_ervs
+        },
+        solo_ltrs: {
+          plus:  plus_solo_ltrs,
+          minus: minus_solo_ltrs
         }
       })
-    end.reject do |hash|
-      hash[:ltr_pairs][:plus].empty? && hash[:ltr_pairs][:minus].empty?
     end
   end
   
@@ -82,19 +86,19 @@ class BlastParser
     end
   end
   
-  def formatted_genomic_regions
+  def formatted_genomic_regions(distance)
     flanking_regions!.inject([]) do |fasta_sequences, hash|
       plus_regions = hash[:flanking_pairs][:plus].inject([]) do |array, putative_erv|
         array.concat([
-          formatted_region(hash[:definition], "5' genomic region", "plus", hash[:accession], putative_erv[:putative_erv].first.hit_from, -FLANKING_DISTANCE..-1, putative_erv[:flanking_5]),
-          formatted_region(hash[:definition], "3' genomic region", "plus", hash[:accession], putative_erv[:putative_erv].first.hit_to, 1..FLANKING_DISTANCE, putative_erv[:flanking_3])
+          formatted_region(hash[:definition], "5' genomic region", "plus", hash[:accession], putative_erv[:putative_erv].first.hit_from, -distance..-1, putative_erv[:flanking_5]),
+          formatted_region(hash[:definition], "3' genomic region", "plus", hash[:accession], putative_erv[:putative_erv].first.hit_to, 1..distance, putative_erv[:flanking_3])
         ])
       end
         
       minus_regions = hash[:flanking_pairs][:minus].inject([]) do |array, putative_erv|
         array.concat([
-          formatted_region(hash[:definition], "5' genomic region", "minus", hash[:accession], putative_erv[:putative_erv].first.hit_from, 1..FLANKING_DISTANCE, putative_erv[:flanking_5]),
-          formatted_region(hash[:definition], "3' genomic region", "minus", hash[:accession], putative_erv[:putative_erv].first.hit_to, -FLANKING_DISTANCE..-1, putative_erv[:flanking_3])
+          formatted_region(hash[:definition], "5' genomic region", "minus", hash[:accession], putative_erv[:putative_erv].first.hit_from, 1..distance, putative_erv[:flanking_5]),
+          formatted_region(hash[:definition], "3' genomic region", "minus", hash[:accession], putative_erv[:putative_erv].first.hit_to, -distance..-1, putative_erv[:flanking_3])
         ])
       end
       
@@ -118,7 +122,36 @@ class BlastParser
     Bio::Sequence::NA.new(string).complement
   end
   
+  def print_solo_ltrs(cell = "%-30s")
+    headers = ["Accession number", "Strand", "From", "To", "Identity"]
+    
+    printf (cell * headers.length + "\n") % headers
+    
+    filter.each do |hsps|
+      print_solo_ltr_group(
+        cell,
+        headers, 
+        (hsps[:solo_ltrs][:plus] + hsps[:solo_ltrs][:minus]).sort_by(&:identity).reverse, 
+        hsps[:accession]
+      )
+    end
+    
+    return nil
+  end
+  
   private
+  
+  def print_solo_ltr_group(cell, headers, solo_ltrs, accession)
+    solo_ltrs.each do |solo_ltr|
+      printf (cell * headers.length + "\n") % [
+        accession,
+        same_strand?(solo_ltr) ? "Plus" : "Minus",
+        solo_ltr.hit_from, 
+        solo_ltr.hit_to,
+        solo_ltr.identity
+      ]
+    end
+  end
   
   def formatted_region(definition, region, strand, accession, position, window, sequence)
     {
@@ -154,9 +187,11 @@ class BlastParser
   end
   
   def filter_array(hsps)
-    hsps.combination(2).select do |match_5, match_3|
+    ervs = hsps.combination(2).select do |match_5, match_3|
       ERV_DISTANCE.include?(match_3.hit_from - match_5.hit_to)
     end
+    
+    [ervs, hsps.reject { |hsp| ervs.flatten.include?(hsp) }]
   end
   
   def parse_coordinates(hsps)
@@ -176,5 +211,6 @@ class BlastParser
   end
 end
 
-# parser = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotation 3 - Johnson/Canis Lupus Familiaris/GY1D8VT9016-Alignment.xml")
+# parser = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Canis Lupus Familiaris/Candidate Sequences/LTR against CanFam3.1.xml")
 # parser.flanking_regions_as_fasta!("/Users/evansenter/Desktop/genomic_regions.fasta")
+# parser.print_solo_ltrs
