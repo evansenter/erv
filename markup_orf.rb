@@ -1,6 +1,6 @@
 require "bio"
 require "./fasta_parser.rb"
-require "./printer.rb"
+require "./markup_printer.rb"
 
 class Erv
   include FastaParser
@@ -64,7 +64,7 @@ class Erv
   end
   
   def printer(tens_of_aa = 6)
-    Printer.new(self, tens_of_aa)
+    MarkupPrinter.new(self, tens_of_aa)
   end
   
   def print(tens_of_aa = 6)

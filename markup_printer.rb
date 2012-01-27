@@ -1,4 +1,4 @@
-class Printer
+class MarkupPrinter
   attr_reader :erv, :tens_of_aa
   
   def initialize(erv, tens_of_aa)
