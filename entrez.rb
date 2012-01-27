@@ -1,3 +1,4 @@
+require "bio"
 require "entrez"
 
 module EntrezSequence

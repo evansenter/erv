@@ -1,40 +1,59 @@
 require "bio"
-require "./entrez.rb"
 require "./putative_erv.rb"
 require "./ltr.rb"
 
-class BlastParser  
-  include EntrezSequence
-  
+class BlastParser
   ERV_DISTANCE = 4_000..12_000
   
   attr_reader :report
-
-  def self.bootstrap(path)
-    new(Bio::Blast::Report.new(File.read(path)))
-  end
   
-  def self.solo_ltrs_from_batch(files, ignore_regex = nil)
-    # Dir["/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/*.xml"]
-    
-    parsers           = files.map(&method(:bootstrap))
-    solo_ltrs         = parsers.map { |parser| parser.solo_ltrs(ignore_regex) }.inject(&:concat)
-    grouped_solo_ltrs = solo_ltrs.inject([]) do |grouped_ltrs, ltr|
-      grouped_ltrs.tap do
-        if matching_ltr_group = grouped_ltrs.find { |ltr_group| ltr_group.first == ltr }
-          matching_ltr_group << ltr
-        else
-          grouped_ltrs << [ltr]
-        end
+  class << self
+    def bootstrap(path)
+      new(Bio::Blast::Report.new(File.read(path)))
+    end
+
+    def solo_ltrs_from_batch(files, ignore_regex = nil)
+      # Dir["/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/*.xml"]
+
+      parsers   = files.map(&method(:bootstrap))
+      solo_ltrs = parsers.map { |parser| parser.solo_ltrs(ignore_regex) }.inject(&:concat)
+
+      curate_similar_ltrs(solo_ltrs)
+    end
+
+    def write_solo_ltr_batch!(solo_ltrs, directory)
+      solo_ltrs.each do |solo_ltr|
+        write_fasta!(File.join(directory, solo_ltr.fasta_filename), solo_ltr.fasta_hash)
       end
     end
     
-    grouped_solo_ltrs.map { |ltr_group| ltr_group.sort_by(&:length).last }
-  end
-  
-  def self.write_solo_ltr_batch!(solo_ltrs, directory)
-    solo_ltrs.each do |solo_ltr|
-      write_fasta!(File.join(directory, solo_ltr.fasta_filename), solo_ltr.fasta_hash)
+    def curate_similar_ltrs(solo_ltrs)
+      grouped_solo_ltrs = solo_ltrs.inject([]) do |grouped_ltrs, ltr|
+        grouped_ltrs.tap do
+          if matching_ltr_group = grouped_ltrs.find { |ltr_group| ltr_group.first == ltr }
+            matching_ltr_group << ltr
+          else
+            grouped_ltrs << [ltr]
+          end
+        end
+      end
+
+      grouped_solo_ltrs.map { |ltr_group| ltr_group.sort_by(&:length).last }
+    end
+
+    private
+
+    def write_fasta!(path, fasta_content)
+      unless File.exists?(path)
+        File.open(path, "w") do |file|
+          [fasta_content].flatten.each do |fasta_sequence|
+            file.write(fasta_sequence[:comment])
+            file.write("\n")
+            file.write(fasta_sequence[:sequence])
+            file.write("\n\n")
+          end
+        end
+      end
     end
   end
   
@@ -43,9 +62,11 @@ class BlastParser
   end
   
   def filtered_ltrs(ignore_regex = nil)
-    report.hits.reject { |hit| hit.definition =~ ignore_regex if ignore_regex }.map do |hit|
+    ltrs = report.hits.reject { |hit| hit.definition =~ ignore_regex if ignore_regex }.map do |hit|
       parse_hsps(hit)
     end.flatten
+    
+    self.class.curate_similar_ltrs(ltrs)
   end
   
   def putative_ervs
@@ -63,19 +84,6 @@ class BlastParser
   end
   
   private
-  
-  def self.write_fasta!(path, fasta_content)
-    unless File.exists?(path)
-      File.open(path, "w") do |file|
-        [fasta_content].flatten.each do |fasta_sequence|
-          file.write(fasta_sequence[:comment])
-          file.write("\n")
-          file.write(fasta_sequence[:sequence])
-          file.write("\n\n")
-        end
-      end
-    end
-  end
   
   def find_ervs(ltrs)
     ltrs.combination(2).select do |match_5, match_3|
