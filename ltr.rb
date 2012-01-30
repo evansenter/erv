@@ -1,7 +1,9 @@
 require "./entrez.rb"
+require "./fasta_printer.rb"
 
 class Ltr
   include EntrezSequence
+  include FastaPrinter
   
   attr_reader :hit, :hsp
   
@@ -10,40 +12,20 @@ class Ltr
     @hsp = hsp
   end
   
-  def fasta_hash
-    {
-      comment:  fasta_comment,
-      sequence: seq
-    }
-  end
-  
-  def fasta_comment
-    "> %s (%s (%s) %s to %s, %s nt. long)" % [
-      hit.definition,
-      hit.accession,
-      plus_strand? ? "+" : "-",
-      from,
-      to,
-      length
-    ]
-  end
-  
-  def fasta_filename
-    "%s %s %s %s %s.fasta" % [
-      hit.definition.split(/,/).first,
-      hit.accession,
-      plus_strand? ? "plus" : "minus",
-      from,
-      to
-    ]
-  end
-  
   def plus_strand?
     hsp.query_frame == hsp.hit_frame
   end
   
   def minus_strand?
     !plus_strand?
+  end
+  
+  def definition
+    hit.definition
+  end
+  
+  def accession
+    hit.accession
   end
   
   def hit_id

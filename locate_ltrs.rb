@@ -13,8 +13,6 @@ class BlastParser
     end
 
     def solo_ltrs_from_batch(files, ignore_regex = nil)
-      # Dir["/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/*.xml"]
-
       parsers   = files.map(&method(:bootstrap))
       solo_ltrs = parsers.map { |parser| parser.solo_ltrs(ignore_regex) }.inject(&:concat)
 
@@ -23,7 +21,19 @@ class BlastParser
 
     def write_solo_ltr_batch!(solo_ltrs, directory)
       solo_ltrs.each do |solo_ltr|
-        write_fasta!(File.join(directory, solo_ltr.fasta_filename), solo_ltr.fasta_hash)
+        solo_ltr.write_fasta!(directory)
+      end
+    end
+    
+    def putative_ervs_from_batch(files)
+      parsers = files.map(&method(:bootstrap))
+      
+      parsers.map(&:putative_ervs).inject(&:concat)
+    end
+    
+    def write_putative_erv_batch!(putative_ervs, directory)
+      putative_ervs.each do |putative_erv|
+        putative_erv.write_fasta!(directory)
       end
     end
     
@@ -39,21 +49,6 @@ class BlastParser
       end
 
       grouped_solo_ltrs.map { |ltr_group| ltr_group.sort_by(&:length).last }
-    end
-
-    private
-
-    def write_fasta!(path, fasta_content)
-      unless File.exists?(path)
-        File.open(path, "w") do |file|
-          [fasta_content].flatten.each do |fasta_sequence|
-            file.write(fasta_sequence[:comment])
-            file.write("\n")
-            file.write(fasta_sequence[:sequence])
-            file.write("\n\n")
-          end
-        end
-      end
     end
   end
   
@@ -89,7 +84,7 @@ class BlastParser
     ltrs.combination(2).select do |match_5, match_3|
       ERV_DISTANCE.include?(match_3.up_coord - match_5.down_coord)
     end.map do |ltr_pair|
-      PutativeErv.new(ltr_pair)
+      PutativeErv.new(*ltr_pair)
     end
   end
   
@@ -102,7 +97,6 @@ class BlastParser
   end
 end
 
+# files  = Dir["/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/*.xml"]
 # parser = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Canis Lupus Familiaris/Candidate Sequences/LTR against CanFam3.1.xml")
 # parser = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/J34ZR93001R-Alignment.xml")
-# parser.flanking_regions_as_fasta!("/Users/evansenter/Desktop/genomic_regions.fasta")
-# parser.print_solo_ltrs
