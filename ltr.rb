@@ -68,7 +68,7 @@ class Ltr
   end
   
   def ==(other_ltr)
-    hit.accession == other_ltr.hit.accession && coord_window(from).include?(other_ltr.from) && coord_window(to).include?(to)
+    accession == other_ltr.accession && coord_window(from).include?(other_ltr.from) && coord_window(to).include?(other_ltr.to)
   end
   
   def inspect

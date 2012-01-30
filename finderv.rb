@@ -2,8 +2,8 @@ require "bio"
 require "./putative_erv.rb"
 require "./ltr.rb"
 
-class BlastParser
-  ERV_DISTANCE = 4_000..12_000
+class Finderv
+  ERV_DISTANCE = 200..12_000
   
   attr_reader :report
   
@@ -16,7 +16,7 @@ class BlastParser
       parsers   = files.map(&method(:bootstrap))
       solo_ltrs = parsers.map { |parser| parser.solo_ltrs(ignore_regex) }.inject(&:concat)
 
-      curate_similar_ltrs(solo_ltrs)
+      curate_similar(solo_ltrs)
     end
 
     def write_solo_ltr_batch!(solo_ltrs, directory)
@@ -27,8 +27,9 @@ class BlastParser
     
     def putative_ervs_from_batch(files)
       parsers = files.map(&method(:bootstrap))
+      ervs    = parsers.map(&:putative_ervs).inject(&:concat)
       
-      parsers.map(&:putative_ervs).inject(&:concat)
+      curate_similar(ervs)
     end
     
     def write_putative_erv_batch!(putative_ervs, directory)
@@ -37,18 +38,18 @@ class BlastParser
       end
     end
     
-    def curate_similar_ltrs(solo_ltrs)
-      grouped_solo_ltrs = solo_ltrs.inject([]) do |grouped_ltrs, ltr|
-        grouped_ltrs.tap do
-          if matching_ltr_group = grouped_ltrs.find { |ltr_group| ltr_group.first == ltr }
-            matching_ltr_group << ltr
+    def curate_similar(elements)
+      grouped_elements = elements.inject([]) do |grouped_elements, element|
+        grouped_elements.tap do
+          if matching_element_group = grouped_elements.find { |element_group| element_group.first == element }
+            matching_element_group << element
           else
-            grouped_ltrs << [ltr]
+            grouped_elements << [element]
           end
         end
       end
 
-      grouped_solo_ltrs.map { |ltr_group| ltr_group.sort_by(&:length).last }
+      grouped_elements.map { |element_group| element_group.sort_by(&:length).last }
     end
   end
   
@@ -61,15 +62,17 @@ class BlastParser
       parse_hsps(hit)
     end.flatten
     
-    self.class.curate_similar_ltrs(ltrs)
+    curate_similar(ltrs)
   end
   
   def putative_ervs
-    report.hits.map do |hit|
+    ervs = report.hits.map do |hit|
       parse_hsps(hit).partition(&:plus_strand?).map do |ltrs|
         find_ervs(ltrs)
       end
     end.flatten
+    
+    curate_similar(ervs)
   end
   
   def solo_ltrs(ignore_regex = nil)
@@ -79,6 +82,10 @@ class BlastParser
   end
   
   private
+  
+  def curate_similar(elements)
+    self.class.curate_similar(elements)
+  end
   
   def find_ervs(ltrs)
     ltrs.combination(2).select do |match_5, match_3|
@@ -98,5 +105,5 @@ class BlastParser
 end
 
 # files  = Dir["/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/*.xml"]
-# parser = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Canis Lupus Familiaris/Candidate Sequences/LTR against CanFam3.1.xml")
-# parser = BlastParser.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/J34ZR93001R-Alignment.xml")
+# parser = Finderv.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Canis Lupus Familiaris/Candidate Sequences/LTR against CanFam3.1.xml")
+# parser = Finderv.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/J34ZR93001R-Alignment.xml")

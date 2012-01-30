@@ -40,11 +40,19 @@ class PutativeErv
     ltrs.last.down_coord - ltrs.first.up_coord + 1
   end
   
+  def coord_window(coord)
+    (coord - 200)..(coord + 200)
+  end
+  
   def from
     plus_strand? ? ltrs.first.up_coord : ltrs.last.down_coord
   end
   
   def to
     minus_strand? ? ltrs.first.up_coord : ltrs.last.down_coord
+  end
+  
+  def ==(other_erv)
+    accession == other_erv.accession && coord_window(from).include?(other_erv.from) && coord_window(to).include?(other_erv.to)
   end
 end
