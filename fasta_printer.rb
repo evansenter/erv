@@ -1,8 +1,7 @@
 require "bio"
+require "active_support/core_ext/kernel/reporting"
 
 module FastaPrinter
-  # Expects a method seq
-  
   def self.included(base)
     base.send(:include, InstanceMethods)
   end
@@ -16,24 +15,33 @@ module FastaPrinter
     end
 
     def fasta_comment
-      "> %s (%s (%s) %s to %s, %s nt. long)" % [
+      "> %s ((%s) %s nt. long) %s %s %s" % [
         definition,
-        accession,
         plus_strand? ? "+" : "-",
+        length,
+        accession,
         from,
-        to,
-        length
+        to
       ]
     end
 
     def fasta_filename
-      "%s %s %s %s %s.fasta" % [
+      "%s %s %s %s %s %s.fasta" % [
         definition.split(/,/).first,
         accession,
         plus_strand? ? "plus" : "minus",
         from,
-        to
+        to,
+        type
       ]
+    end
+    
+    def print_fasta
+      silence_stream(STDERR) do
+        puts fasta_comment
+        puts seq
+        puts
+      end
     end
     
     def write_fasta!(directory)

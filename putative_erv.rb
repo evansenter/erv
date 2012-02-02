@@ -22,6 +22,10 @@ class PutativeErv
     ltrs.all? { |ltr| ltr.minus_strand? }
   end
   
+  def type
+    "erv"
+  end
+  
   def definition
     ltrs.first.definition
   end

@@ -20,6 +20,10 @@ class Ltr
     !plus_strand?
   end
   
+  def type
+    "ltr"
+  end
+  
   def definition
     hit.definition
   end
