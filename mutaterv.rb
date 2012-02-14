@@ -47,7 +47,7 @@ class Mutaterv
     unless (number_of_stops = translated_sequence.count("*")) == 1
       number_of_stops
     else
-      translated_sequence[-15..-1].include?("*") ? -1 : 1
+      translated_sequence[0...15].include?(?M) && translated_sequence[-15..-1].include?(?*) ? -1 : 1
     end
   end
   
