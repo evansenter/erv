@@ -30,12 +30,18 @@ class RatioCalculator
   end
   
   def counter
-    inject({ transitions: 0.0, transversions: 0.0 }) do |hash, (from, to)|
+    counter_hash = inject({ transitions: 0.0, transversions: 0.0 }) do |hash, (from, to)|
       hash.tap do
         if from != to
           hash[TRANSITION_HASH[from] == to ? :transitions : :transversions] += 1
         end
       end
+    end
+    
+    if counter_hash[:transitions].zero? || counter_hash[:transversions].zero?
+      { transitions: 1.0, transversions: 1.0 }
+    else
+      counter_hash
     end
   end
   
