@@ -1,15 +1,18 @@
+require "./commune.rb"
 require "./entrez.rb"
 require "./fasta_printer.rb"
 
 class Ltr
+  include Commune
   include EntrezSequence
   include FastaPrinter
   
-  attr_reader :hit, :hsp
+  attr_reader :hit, :hsp, :buffer_size
   
-  def initialize(hit, hsp)
-    @hit = hit
-    @hsp = hsp
+  def initialize(hit, hsp, buffer_size = 0)
+    @hit         = hit
+    @hsp         = hsp
+    @buffer_size = buffer_size
   end
   
   def plus_strand?
@@ -18,10 +21,6 @@ class Ltr
   
   def minus_strand?
     !plus_strand?
-  end
-  
-  def type
-    "ltr"
   end
   
   def definition
@@ -37,10 +36,10 @@ class Ltr
     hit.hit_id.split("|")[1]
   end
   
-  def seq
-    raw_sequence = na_sequence_from_entrez(hit_id, up_coord, 0...length)
+  def raw_seq
+    @raw_sequence ||= na_sequence_from_entrez(hit_id, up_coord, 0...length, buffer_size)
     
-    minus_strand? ? raw_sequence.complement : raw_sequence
+    minus_strand? ? @raw_sequence.complement : @raw_sequence
   end
   
   def length

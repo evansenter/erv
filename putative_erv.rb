@@ -1,14 +1,17 @@
+require "./commune.rb"
 require "./entrez.rb"
 require "./fasta_printer.rb"
 
 class PutativeErv
+  include Commune
   include EntrezSequence
   include FastaPrinter
   
-  attr_reader :ltrs
+  attr_reader :ltrs, :buffer_size
   
-  def initialize(ltr_1, ltr_2)
-    @ltrs = [ltr_1, ltr_2].sort_by(&:midpoint)
+  def initialize(ltr_1, ltr_2, buffer_size = 0)
+    @ltrs        = [ltr_1, ltr_2].sort_by(&:midpoint)
+    @buffer_size = buffer_size
     
     raise "LTRs must be in the same orientation" unless ltrs.map(&:plus_strand?).uniq.length == 1
     raise "LTRs must have the same Hit ID" unless ltrs.map(&:hit_id).uniq.length == 1
@@ -22,10 +25,6 @@ class PutativeErv
     ltrs.all? { |ltr| ltr.minus_strand? }
   end
   
-  def type
-    "erv"
-  end
-  
   def definition
     ltrs.first.definition
   end
@@ -34,10 +33,10 @@ class PutativeErv
     ltrs.first.accession
   end
   
-  def seq
-    raw_sequence = na_sequence_from_entrez(ltrs.first.hit_id, ltrs.first.up_coord, 0...length)
+  def raw_seq
+    @raw_sequence ||= na_sequence_from_entrez(ltrs.first.hit_id, ltrs.first.up_coord, 0...length, buffer_size)
     
-    minus_strand? ? raw_sequence.complement : raw_sequence
+    minus_strand? ? @raw_sequence.complement : @raw_sequence
   end
   
   def length

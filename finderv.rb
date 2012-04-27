@@ -4,6 +4,7 @@ require "./ltr.rb"
 
 class Finderv
   ERV_DISTANCE = 200..12_000
+  TSD_BUFFER   = 75
   
   attr_reader :report
   
@@ -91,7 +92,7 @@ class Finderv
     ltrs.combination(2).select do |match_5, match_3|
       ERV_DISTANCE.include?(match_3.up_coord - match_5.down_coord)
     end.map do |ltr_pair|
-      PutativeErv.new(*ltr_pair)
+      PutativeErv.new(*ltr_pair, TSD_BUFFER)
     end
   end
   
@@ -99,11 +100,12 @@ class Finderv
     hit.hsps.select do |hsp| 
       hsp.align_len > report.query_len * 0.8
     end.map do |hsp|
-      Ltr.new(hit, hsp)
+      Ltr.new(hit, hsp, TSD_BUFFER)
     end.sort_by(&:midpoint)
   end
 end
 
-# files  = Dir["/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/*.xml"]
-# parser = Finderv.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Canis Lupus Familiaris/Candidate Sequences/LTR against CanFam3.1.xml")
-# parser = Finderv.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/J34ZR93001R-Alignment.xml")
+# chimera = "/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Ted's Stuff/New ERV-Fc LTR - Alignment.xml"
+# files   = Dir["/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/*.xml"]
+# parser  = Finderv.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Canis Lupus Familiaris/Candidate Sequences/LTR against CanFam3.1.xml")
+# parser  = Finderv.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/J34ZR93001R-Alignment.xml")
