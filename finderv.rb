@@ -26,9 +26,18 @@ class Finderv
       end
     end
     
-    def putative_ervs_from_batch(files)
+    def putative_ervs_from_batch(files, chimeras = false)
       parsers = files.map(&method(:bootstrap))
-      ervs    = parsers.map(&:putative_ervs).inject(&:concat)
+      
+      ervs = if chimeras
+        curate_similar(
+          parsers.map { |parser| parser.report.hits.map { |hit| parser.parse_hsps(hit) } }.flatten.group_by(&:hit_id).values.map do |hit_group|
+            hit_group.flatten.partition(&:plus_strand?).map(&method(:find_ervs))
+          end.flatten
+          )
+      else
+        parsers.map(&:putative_ervs).inject(&:concat)
+      end
       
       curate_similar(ervs)
     end
@@ -52,6 +61,14 @@ class Finderv
 
       grouped_elements.map { |element_group| element_group.sort_by(&:length).last }
     end
+    
+    def find_ervs(ltrs)
+      ltrs.combination(2).select do |match_5, match_3|
+        ERV_DISTANCE.include?(match_3.up_coord - match_5.down_coord)
+      end.map do |ltr_pair|
+        PutativeErv.new(*ltr_pair, TSD_BUFFER)
+      end
+    end
   end
   
   def initialize(report)
@@ -67,11 +84,7 @@ class Finderv
   end
   
   def putative_ervs
-    ervs = report.hits.map do |hit|
-      parse_hsps(hit).partition(&:plus_strand?).map do |ltrs|
-        find_ervs(ltrs)
-      end
-    end.flatten
+    ervs = ltrs_by_hit_and_strand { |strand_partition| strand_partition.map { |partition| self.class.find_ervs(partition) } }.flatten
     
     curate_similar(ervs)
   end
@@ -82,26 +95,25 @@ class Finderv
     filtered_ltrs(ignore_regex).reject { |ltr| ervs.include?(ltr) }
   end
   
-  private
-  
-  def curate_similar(elements)
-    self.class.curate_similar(elements)
-  end
-  
-  def find_ervs(ltrs)
-    ltrs.combination(2).select do |match_5, match_3|
-      ERV_DISTANCE.include?(match_3.up_coord - match_5.down_coord)
-    end.map do |ltr_pair|
-      PutativeErv.new(*ltr_pair, TSD_BUFFER)
-    end
-  end
-  
   def parse_hsps(hit)
     hit.hsps.select do |hsp| 
       hsp.align_len > report.query_len * 0.8
     end.map do |hsp|
       Ltr.new(hit, hsp, TSD_BUFFER)
     end.sort_by(&:midpoint)
+  end
+  
+  private
+  
+  def curate_similar(elements)
+    self.class.curate_similar(elements)
+  end
+  
+  def ltrs_by_hit_and_strand
+    report.hits.map do |hit|
+      partition = parse_hsps(hit).partition(&:plus_strand?)
+      block_given? ? yield(partition) : partition
+    end
   end
 end
 
