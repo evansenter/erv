@@ -116,8 +116,3 @@ class Finderv
     end
   end
 end
-
-# chimera = "/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Ted's Stuff/New ERV-Fc LTR - Alignment.xml"
-# files   = Dir["/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/*.xml"]
-# parser  = Finderv.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Canis Lupus Familiaris/Candidate Sequences/LTR against CanFam3.1.xml")
-# parser  = Finderv.bootstrap("/Users/evansenter/Documents/School/BC/Rotations/Rotation 3 - Johnson/Kate's Stuff/J34ZR93001R-Alignment.xml")

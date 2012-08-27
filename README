@@ -1,0 +1,10 @@
+Call the program in the following fashion:
+
+ruby find_erv.rb path/to/folder/with/xml/files
+
+...and after running, the folder with the XML files should contain .fasta files corresponding to the putative ERVs. From the source code, the files of importance are:
+
+find_erv.rb     - Main shell script to run from the command line.
+finderv.rb      - Functions to search for putative ERVs / solo LTRs. There are other functions in this file that may be of interest, take a look inside.
+putative_erv.rb - Class that represents a putative ERV.
+ltr.rb          - Class that represents an LTR (PutativeErv is made up of two LTR classes).
