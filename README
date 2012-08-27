@@ -1,6 +1,10 @@
 Call the program in the following fashion:
 
-ruby find_erv.rb path/to/folder/with/xml/files
+ruby find_erv.rb erv path/to/folder/with/xml/files
+
+...or...
+
+ruby find_erv.rb ltr path/to/folder/with/xml/files
 
 ...and after running, the folder with the XML files should contain .fasta files corresponding to the putative ERVs. From the source code, the files of importance are:
 
