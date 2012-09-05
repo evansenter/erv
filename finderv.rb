@@ -92,7 +92,7 @@ class Finderv
   def solo_ltrs(ignore_regex = nil)
     ervs = putative_ervs.map(&:ltrs).inject(&:concat)
     
-    filtered_ltrs(ignore_regex).reject { |ltr| ervs.include?(ltr) }
+    filtered_ltrs(ignore_regex).reject { |ltr| (ervs || []).include?(ltr) }
   end
   
   def parse_hsps(hit)
