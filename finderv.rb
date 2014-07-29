@@ -39,6 +39,9 @@ class Finderv
         parsers.map(&:putative_ervs).inject(&:concat)
       end
       
+      p parsers
+      p ervs
+      
       curate_similar(ervs)
     end
     
